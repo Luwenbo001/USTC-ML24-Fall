@@ -7,7 +7,6 @@ from tqdm import tqdm
 from datasets import Dataset, load_from_disk, load_dataset, concatenate_datasets
 from typing import Tuple
 from model import BaseModel
-
 from utils import(
     TrainConfigR,
     TrainConfigC,
@@ -40,9 +39,15 @@ def data_preprocessing_regression(data_path: str, saved_to_disk: bool = False) -
     # Preprocess the dataset
     # Use dataset.to_pandas() to convert the dataset to a pandas DataFrame if you are more comfortable with pandas
     # TODO：You must do something in 'Run_time' column, and you can also do other preprocessing steps
+    dataset['train'] = dataset['train'].remove_columns('__index_level_0__')
 
-    # dataset = Dataset.from_pandas(dataset) # Convert the pandas DataFrame back to a dataset
-    return NotImplementedError
+    # for i in range(len(dataset['train'])):
+    #     dataset['train'][i]['Run_time'] = np.log(dataset['train'][i]['Run_time'])
+
+        # dataset['train'][i] =
+    
+    # # dataset = Dataset.from_pandas(dataset) # Convert the pandas DataFrame back to a dataset
+    return dataset['train']
 
 def data_split_regression(dataset: Dataset, batch_size: int, shuffle: bool) -> Tuple[DataLoader]:
     r"""Split the dataset and make it ready for training.
@@ -58,11 +63,19 @@ def data_split_regression(dataset: Dataset, batch_size: int, shuffle: bool) -> T
     # 1.1-b
     # Split the dataset using dataset.train_test_split() or other methods
     # TODO: Split the dataset
+    split_data = dataset.train_test_split(test_size=0.2, shuffle=True)
+    train_data, test_data = split_data['train'], split_data['test']
+    split_data = test_data.train_test_split(test_size=0.5, shuffle=True)
+    test_data, val_data = split_data['train'], split_data['test']
 
+    train_data = concatenate_datasets([train_data, val_data])
+    
     # Create a DataLoader for each split
     # TODO: Create a DataLoader for each split
-
-    return NotImplementedError
+    train_data = DataLoader(train_data, batch_size=batch_size,shuffle=shuffle,train=1) #train
+    test_data = DataLoader(test_data, batch_size=batch_size,shuffle=shuffle,train=0) #test
+    val_data = DataLoader(val_data, batch_size=batch_size,shuffle=shuffle,train=0) #val
+    return train_data, test_data
 
 # 1.2
 class LinearRegression(BaseModel):
@@ -97,12 +110,16 @@ class LinearRegression(BaseModel):
         # 1.2-a
         # Look up the definition of BaseModel and Parameter in the utils.py file, and use them to register the parameters
         # TODO: Register the parameters
+        self.w = Parameter(np.random.randn(in_features, out_features))
+        self.b = Parameter(np.random.randn(out_features))
     
     def predict(self, x: np.ndarray) -> np.ndarray:
         # 1.2-b
         # Implement the forward pass of the model
         # TODO: Implement the forward pass
-        return NotImplementedError
+        self.b = self.b.reshape(1, -1)
+        # print("x.shape=",x.shape,"w.shape=",self.w.shape,"b.shape=",self.b.shape)
+        return np.matmul(x , self.w) + self.b
 
 # 1.3
 class MSELoss(Loss):
@@ -127,7 +144,8 @@ class MSELoss(Loss):
         # 1.3-a
         # Compute the mean squared error loss. Make sure y_pred and y_true have the same shape
         # TODO: Compute the mean squared error loss
-        return NotImplementedError
+        Squared_error = np.square(y_pred - y_true)
+        return np.mean(Squared_error)
     
     def backward(self, x: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray) -> dict[str, np.ndarray]:
         r"""Compute the gradients of the loss with respect to the parameters.
@@ -143,8 +161,10 @@ class MSELoss(Loss):
         # 1.3-b
         # Make sure y_pred and y_true have the same shape
         # TODO: Compute the gradients of the loss with respect to the parameters
-
-        return NotImplementedError
+        batch_size = y_pred.shape[0]
+        grad_w = 2 * (x.T @ (y_pred - y_true)) / batch_size
+        grad_b = 2 * np.mean(y_pred - y_true, axis=0)
+        return {'w': grad_w, 'b': grad_b}
     
 
 # 1.4
@@ -191,16 +211,51 @@ class TrainerR:
                 # 1.4-a
                 # load data from train_loader and compute the loss
                 # TODO: Load data from train_loader and compute the loss
-                
-
+                dataset_size = len(self.train_loader.dataset)
+                for i,x in enumerate(self.train_loader.dataset):
+                    if i & (self.train_loader.batch_size - 1) == 0:
+                        X = []
+                        Y = []
+                    y = x['Run_time']
+                    del x['Run_time']
+                    x = list(x.values())
+                    X.append(x)
+                    Y.append(y)
+                    if i & (self.train_loader.batch_size - 1) == (self.train_loader.batch_size - 1) or i == dataset_size - 1:
+                        X = np.array(X)
+                        Y = np.array(Y)
+                        Y = Y.reshape(-1, 1)   
+                        y_pred = self.model(X)
+                        loss = self.criterion(y_pred, Y)
+                        loss_list.append(loss)
+                        pbar.set_description(f"Loss: {loss}")
+                        grads = self.criterion.backward(X, y_pred, Y)
+                        self.opt.step(grads)
+                        self.step += 1
+                        pbar.update()
                 # Use pbar.set_description() to display current loss in the progress bar
 
                 # Compute the gradients of the loss with respect to the parameters
                 # Update the parameters with the gradients
                 # TODO: Compute gradients and update the parameters
 
-                self.step += 1
-                pbar.update()
+                # for x in self.train_loader.dataset:
+                #     y = x['Run_time']
+                #     del x['Run_time']
+                #     x = list(x.values())
+                #     x = np.array(x)
+                #     y = np.array(y)
+                #     x = x.reshape(1, -1)
+                #     y = y.reshape(1, -1)
+                #     y_pred = self.model(x)
+                #     loss = self.criterion(y_pred, y)
+                #     loss_list.append(loss)
+                #     pbar.set_description(f"Loss: {loss}")
+                #     grads = self.criterion.backward(x, y_pred, y)
+                #     self.opt.step(grads)    
+                #     self.step += 1
+                #     pbar.update()
+                
         
         plt.plot(loss_list)
         plt.xlabel('Steps')
@@ -230,17 +285,33 @@ def eval_LinearRegression(model: LinearRegression, loader: DataLoader) -> Tuple[
     # 1.6-a
     # Iterate over the data loader and compute the predictions
     # TODO: Evaluate the model
-
+    X = []
+    Y = []
+    R_2 = 1
+    for i,x in enumerate(loader.dataset):
+        y = x['Run_time']
+        del x['Run_time']
+        x = list(x.values())
+        X.append(x)
+        Y.append(y)
+    X = np.array(X)
+    Y = np.array(Y)
+    target = Y.reshape(-1, 1)   
+    pred = model(X)
+    mse = np.mean(np.square(pred - target))
+    relative_error = np.abs(np.mean(pred)-np.mean(target))/np.mean(target)
+    R_2 = R_2 - mse/np.var(target)
     # Compute the mean Run_time as Output
     # You can alse compute MSE and relative error
     # TODO: Compute metrics
-    #print(f"Mean Squared Error: {mse}")
+    print(f"Mean Squared Error: {mse}")
 
-    #print(mu_target)
+    print(f"R^2: {R_2}")
+    # print(mu_target)
 
-    #print(f"Relative Error: {relative_error}")
+    print(f"Relative Error: {relative_error}")
 
-    return NotImplementedError
+    return np.mean(pred), relative_error
 
 
 # 2.1
@@ -263,9 +334,15 @@ def data_preprocessing_classification(data_path: str, mean: float, saved_to_disk
     # Preprocess the dataset
     # Use dataset.to_pandas() to convert the dataset to a pandas DataFrame if you are more comfortable with pandas
     # TODO：You must do something in 'Run_time' column, and you can also do other preprocessing steps
-
-    # dataset = Dataset.from_pandas(dataset) # Convert the pandas DataFrame back to a dataset
-    return NotImplementedError
+    for i in range(len(dataset)):
+        dataset['train'][i]['Run_time'] = np.log(dataset['train'][i]['Run_time'])
+    # 假设mean是log处理过的
+    
+    dataset['train'] = dataset['train'].map(lambda x: {'label': 1 if x['Run_time'] > mean else 0})
+    dataset['train'] = dataset['train'].remove_columns('Run_time')
+    # dataset = Dataset.from_pandas(dataset)
+    #  # Convert the pandas DataFrame back to a dataset
+    return dataset['train']
 
 def data_split_classification(dataset: Dataset) -> Tuple[Dataset]:
     r"""Split the dataset and make it ready for training.
@@ -279,8 +356,16 @@ def data_split_classification(dataset: Dataset) -> Tuple[Dataset]:
     # 2.1-b
     # Split the dataset using dataset.train_test_split() or other methods
     # TODO: Split the dataset
+    split_data = dataset.train_test_split(test_size=0.2, shuffle=True)
+    train_data, test_data = split_data['train'], split_data['test']
+    split_data = test_data.train_test_split(test_size=0.5, shuffle=True)
+    test_data, val_data = split_data['train'], split_data['test']
 
-    return NotImplementedError
+    train_data = concatenate_datasets([train_data, val_data])
+    
+    # Create a DataLoader for each split
+    # TODO: Create a DataLoader for each split
+    return (train_data, test_data)
 
 # 2.2
 class LogisticRegression(BaseModel):
@@ -321,7 +406,7 @@ class LogisticRegression(BaseModel):
         # Look up the definition of BaseModel and Parameter in the utils.py file, and use them to register the parameters
         # This time, you should combine the weights and bias into a single parameter
         # TODO: Register the parameters
-
+        self.beta = Parameter(np.random.randn(in_features + 1, 1))
 
     def predict(self, x: np.ndarray) -> np.ndarray:
         r"""Predict the probability of the input belonging to class 1.
@@ -335,7 +420,7 @@ class LogisticRegression(BaseModel):
         # 2.2-b
         # Implement the forward pass of the model
         # TODO: Implement the forward pass
-        return NotImplementedError
+        return 1 / (1 + np.exp(-x @ self.beta))
     
 # 2.3
 class BCELoss(Loss):
@@ -360,7 +445,15 @@ class BCELoss(Loss):
         # 2.3-a
         # Compute the binary cross entropy loss. Make sure y_pred and y_true have the same shape
         # TODO: Compute the binary cross entropy loss
-        return NotImplementedError
+        # print("y_pred.shape=",y_pred.shape,"y_true.shape=",y_true.shape)
+        # print("y_pred=",y_pred)
+        # print("y_true=",y_true)
+        for i in range(len(y_true)):
+            if y_pred[i] <= 1e-5:
+                y_pred[i] = 1e-5
+            if y_pred[i] >= 1 - 1e-5:
+                y_pred[i] = 1 - 1e-5
+        return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
     
     def backward(self, x: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray) -> dict[str, np.ndarray]:
         r"""Compute the gradients of the loss with respect to the parameters.
@@ -375,9 +468,9 @@ class BCELoss(Loss):
         """
         # 2.3-b
         # Make sure y_pred and y_true have the same shape
-        # TODO: Compute the gradients of the loss with respect to the parameters
-
-        return NotImplementedError
+        # TODO: Compute the gradients of the loss with respect to the parameters Atention: its bceloss
+        grad = x.T @ (y_pred - y_true) / x.shape[0]
+        return {'beta': -grad}
     
 # 2.4
 class TrainerC:
@@ -417,14 +510,35 @@ class TrainerC:
                 # load data from train_loader and compute the loss
                 # TODO: Load data from train_loader and compute the loss
 
+                # Extract the last column of the dataset as y values
+                y = self.dataset[:, -1]
+                x = self.dataset[:, :-1]
+                x = np.concatenate((x, np.ones((x.shape[0], 1))), axis=1)
+                y = y.reshape(-1, 1)
+                y_pred = self.model.predict(x)
+                loss = self.criterion(y_pred, y)
+                loss_list.append(loss)
+                pbar.set_description(f"Loss: {loss}")
+                grads = self.criterion.backward(x, y_pred, y)
+                # print("origin",self.model.beta)
+                # print("gards",grads)
+                self.opt.step(grads)
+                # print("params",self.opt.params)
+                # for name, param in self.opt.params:
+                #     param -= self.opt.lr * grads[name]
+                #     print("param",param,"self.opt.lr * grads[name]",self.opt.lr * grads[name])
+                # print("after",self.model.beta)
+                self.step += 1
+                pbar.update()
+                # return
+ 
+                # python trainC.py --results_path "../results/train/"
                 # Use pbar.set_description() to display current loss in the progress bar
 
                 # Compute the gradients of the loss with respect to the parameters
                 # Update the parameters with the gradients
                 # TODO: Compute gradients and update the parameters
 
-                self.step += 1
-                pbar.update()
 
         with open(self.results_path / 'loss_list.txt', 'w') as f:
             print(loss_list, file=f)
@@ -454,5 +568,17 @@ def eval_LogisticRegression(model: LogisticRegression, dataset: np.ndarray) -> f
     # Iterate over the data and compute the accuracy
     # This time, we use the whole dataset instead of a DataLoader.Don't forget to add a bias term to the input
     # TODO: Evaluate the model
+    X = []
+    Y = []
+    y = dataset[:, -1]
+    x = dataset[:, :-1]
+    x = np.concatenate((x, np.ones((x.shape[0], 1))), axis=1)
+    y = y.reshape(-1, 1)
+    y_pred = model.predict(x)
+    pred = (y_pred > 0.5).astype(int)
+    correct = np.sum(pred == y)
+    accuracy = correct / len(y)
+    print(f"Accuracy: {accuracy}")
+    # python evalC.py --results_path "../results/train/_Classification"
 
-    return NotImplementedError
+    return accuracy
