@@ -40,14 +40,19 @@ def data_preprocessing_regression(data_path: str, saved_to_disk: bool = False) -
     # Use dataset.to_pandas() to convert the dataset to a pandas DataFrame if you are more comfortable with pandas
     # TODO：You must do something in 'Run_time' column, and you can also do other preprocessing steps
     dataset['train'] = dataset['train'].remove_columns('__index_level_0__')
+    data = dataset['train'].to_pandas()
 
-    # for i in range(len(dataset['train'])):
-    #     dataset['train'][i]['Run_time'] = np.log(dataset['train'][i]['Run_time'])
-
-        # dataset['train'][i] =
-    
-    # # dataset = Dataset.from_pandas(dataset) # Convert the pandas DataFrame back to a dataset
-    return dataset['train']
+    # Standardize each column in the dataset
+    for column in data.columns:
+        if column == 'Run_time':
+            data[column] = np.log(data[column])
+        else:
+            data[column] = (data[column] - data[column].mean()) / data[column].std()
+    dataset = Dataset.from_pandas(data)
+    # output = "./output.txt"
+    # with open(output,'w') as f:
+    #     print(data, file=f)
+    return dataset
 
 def data_split_regression(dataset: Dataset, batch_size: int, shuffle: bool) -> Tuple[DataLoader]:
     r"""Split the dataset and make it ready for training.
@@ -145,7 +150,7 @@ class MSELoss(Loss):
         # Compute the mean squared error loss. Make sure y_pred and y_true have the same shape
         # TODO: Compute the mean squared error loss
         Squared_error = np.square(y_pred - y_true)
-        return np.mean(Squared_error)
+        return np.mean(Squared_error) 
     
     def backward(self, x: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray) -> dict[str, np.ndarray]:
         r"""Compute the gradients of the loss with respect to the parameters.
@@ -161,8 +166,10 @@ class MSELoss(Loss):
         # 1.3-b
         # Make sure y_pred and y_true have the same shape
         # TODO: Compute the gradients of the loss with respect to the parameters
+        #请你根据输入的w，写出包含正则化的梯度
+        
         batch_size = y_pred.shape[0]
-        grad_w = 2 * (x.T @ (y_pred - y_true)) / batch_size
+        grad_w = 2 * (x.T @ (y_pred - y_true)) / batch_size 
         grad_b = 2 * np.mean(y_pred - y_true, axis=0)
         return {'w': grad_w, 'b': grad_b}
     
@@ -231,6 +238,8 @@ class TrainerR:
                         pbar.set_description(f"Loss: {loss}")
                         grads = self.criterion.backward(X, y_pred, Y)
                         self.opt.step(grads)
+                        # print(grads)
+                        # print(self.opt.params)
                         self.step += 1
                         pbar.update()
                 # Use pbar.set_description() to display current loss in the progress bar
@@ -238,25 +247,7 @@ class TrainerR:
                 # Compute the gradients of the loss with respect to the parameters
                 # Update the parameters with the gradients
                 # TODO: Compute gradients and update the parameters
-
-                # for x in self.train_loader.dataset:
-                #     y = x['Run_time']
-                #     del x['Run_time']
-                #     x = list(x.values())
-                #     x = np.array(x)
-                #     y = np.array(y)
-                #     x = x.reshape(1, -1)
-                #     y = y.reshape(1, -1)
-                #     y_pred = self.model(x)
-                #     loss = self.criterion(y_pred, y)
-                #     loss_list.append(loss)
-                #     pbar.set_description(f"Loss: {loss}")
-                #     grads = self.criterion.backward(x, y_pred, y)
-                #     self.opt.step(grads)    
-                #     self.step += 1
-                #     pbar.update()
-                
-        
+        print(self.opt.params)
         plt.plot(loss_list)
         plt.xlabel('Steps')
         plt.ylabel('Loss')
@@ -312,7 +303,7 @@ def eval_LinearRegression(model: LinearRegression, loader: DataLoader) -> Tuple[
     print(f"Relative Error: {relative_error}")
 
     return np.mean(pred), relative_error
-
+# python evalR.py --results_path "../results/train/_Regression"
 
 # 2.1
 def data_preprocessing_classification(data_path: str, mean: float, saved_to_disk: bool = False) -> Dataset:
@@ -334,15 +325,28 @@ def data_preprocessing_classification(data_path: str, mean: float, saved_to_disk
     # Preprocess the dataset
     # Use dataset.to_pandas() to convert the dataset to a pandas DataFrame if you are more comfortable with pandas
     # TODO：You must do something in 'Run_time' column, and you can also do other preprocessing steps
-    for i in range(len(dataset)):
-        dataset['train'][i]['Run_time'] = np.log(dataset['train'][i]['Run_time'])
+    # for i in range(len(dataset)):
+    #     dataset['train'][i]['Run_time'] = np.log(dataset['train'][i]['Run_time'])
     # 假设mean是log处理过的
+
+    data = dataset['train'].to_pandas()
+
+    # Standardize each column in the dataset
+    for column in data.columns:
+        if column == 'Run_time':
+            data[column] = np.log(data[column])
+        else:
+            data[column] = (data[column] - data[column].mean()) / data[column].std()
+
+
+
+    dataset = Dataset.from_pandas(data)
+    dataset = dataset.map(lambda x: {'label': 1 if x['Run_time'] > mean else 0})
     
-    dataset['train'] = dataset['train'].map(lambda x: {'label': 1 if x['Run_time'] > mean else 0})
-    dataset['train'] = dataset['train'].remove_columns('Run_time')
+    dataset = dataset.remove_columns('Run_time')
     # dataset = Dataset.from_pandas(dataset)
     #  # Convert the pandas DataFrame back to a dataset
-    return dataset['train']
+    return dataset
 
 def data_split_classification(dataset: Dataset) -> Tuple[Dataset]:
     r"""Split the dataset and make it ready for training.
@@ -470,7 +474,7 @@ class BCELoss(Loss):
         # Make sure y_pred and y_true have the same shape
         # TODO: Compute the gradients of the loss with respect to the parameters Atention: its bceloss
         grad = x.T @ (y_pred - y_true) / x.shape[0]
-        return {'beta': -grad}
+        return {'beta': grad}
     
 # 2.4
 class TrainerC:
