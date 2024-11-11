@@ -187,7 +187,7 @@ class MSELoss(Loss):
         # Make sure y_pred and y_true have the same shape
         # TODO: Compute the gradients of the loss with respect to the parameters
 <<<<<<< HEAD
-        #请你根据输入的w，写出包含正则化的梯度
+        #请你根据输入的 w，写出包含正则化的梯度
         
         batch_size = y_pred.shape[0]
         grad_w = 2 * (x.T @ (y_pred - y_true)) / batch_size 
@@ -384,7 +384,7 @@ def data_preprocessing_classification(data_path: str, mean: float, saved_to_disk
     # TODO：You must do something in 'Run_time' column, and you can also do other preprocessing steps
     # for i in range(len(dataset)):
     #     dataset['train'][i]['Run_time'] = np.log(dataset['train'][i]['Run_time'])
-    # 假设mean是log处理过的
+    # 假设 mean 是 log 处理过的
 
     data = dataset['train'].to_pandas()
 

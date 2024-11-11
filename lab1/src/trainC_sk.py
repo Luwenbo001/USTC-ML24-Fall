@@ -34,6 +34,8 @@ from sklearn.metrics import accuracy_score, classification_report
 import pandas as pd
 import numpy as np
 from sklearn.datasets import make_classification
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -42,62 +44,62 @@ def main():
 
     # Data
     parser.add_argument(
-        "--data_dir", 
-        type=str, 
+        "--data_dir",
+        type=str,
         default="Rosykunai/SGEMM_GPU_performance",
         help="The path to the training data.",
     )
     parser.add_argument(
-        "--mean", 
-        type=float, 
+        "--mean",
+        type=float,
         default=None,
         help="The mean value to classify the data.",
     )
 
     # Model
     parser.add_argument(
-        "--in_features", 
-        type=int, 
+        "--in_features",
+        type=int,
         default=14,
         help="The number of input features.",
     )
 
     # Optimization
     parser.add_argument(
-        "--lr", 
-        type=float, 
+        "--lr",
+        type=float,
         default=2e-6,
         help="The learning rate used for optimization.",
     )
     parser.add_argument(
-        "--lr_decay", 
-        type=float, 
+        "--lr_decay",
+        type=float,
         default=0.99,
         help="The learning rate decay factor when using SGD.",
     )
     parser.add_argument(
-        "--decay_every", 
-        type=int, 
+        "--decay_every",
+        type=int,
         default=10,
         help="The number of steps after which to decay the learning rate.",
     )
 
     # Training
     parser.add_argument(
-        "--steps", 
-        type=int, 
+        "--steps",
+        type=int,
         default=100,
         help="The number of optimization steps to perform.",
     )
     parser.add_argument(
-        "--results_path", 
-        type=str, 
+        "--results_path",
+        type=str,
         default=None,
         help="The path to save the results.",
     )
     parser.add_argument(
-        "--seed", 
-        type=int, 
+        "--seed",
+        type=int,
         default=123,
         help="The seed to use for reproducibility.",
     )
@@ -114,7 +116,7 @@ def main():
         model = LogisticRegression(cfg.in_features)
     else:
         raise ValueError(f"Task {cfg.task} not supported")
-    
+
     # Load the dataset
     dataset = data_preprocessing_classification(cfg.data_dir, cfg.mean)
 
@@ -122,7 +124,7 @@ def main():
 
     results_path = Path(cfg.results_path + f"_{cfg.task}") if cfg.results_path else Path("results")
 
-    train_set = train_set.to_pandas().drop(columns=['__index_level_0__'])
+    train_set = train_set.to_pandas().drop(columns=["__index_level_0__"])
     print(train_set)
     # Train
     print("***** Running training *****")
@@ -139,11 +141,11 @@ def main():
     #     results_path=results_path,
     # ).train()
 
-    x_train = train_set.remove_columns('label')
-    y_train = train_set['label']
+    x_train = train_set.remove_columns("label")
+    y_train = train_set["label"]
 
-    x_test = val_set.remove_columns('label')
-    y_test = val_set['label']
+    x_test = val_set.remove_columns("label")
+    y_test = val_set["label"]
 
     print(x_train)
     x_train = np.ndarray(x_train)
@@ -158,7 +160,7 @@ def main():
     y_pred = log_reg.predict(x_test)
     # 计算准确率
     accuracy = accuracy_score(y_test, y_pred)
-    print(f'准确率: {accuracy:}',accuracy)
+    print(f"准确率：{accuracy:}", accuracy)
 
 
 if __name__ == "__main__":
